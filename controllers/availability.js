@@ -4,7 +4,15 @@ const User = require('../models/User');
 
 
 const getUserAvailability = async (req, res) => {
-    const { email, startRange, endRange } = req.body;
+    // Extraer parámetros desde query (en solicitudes GET)
+    const { email, startRange, endRange } = req.query;
+
+    if (!email || !startRange || !endRange) {
+        return res.status(400).json({
+            ok: false,
+            msg: 'Faltan parámetros en la consulta',
+        });
+    }
 
     try {
         // Encontrar el usuario por correo electrónico
@@ -47,13 +55,14 @@ const getUserAvailability = async (req, res) => {
             })),
         });
     } catch (error) {
-        console.log(error);
+        console.error(error);
         res.status(500).json({
             ok: false,
             msg: 'Error inesperado, contacte al administrador',
         });
     }
 };
+
 
 
 module.exports = {
