@@ -19,6 +19,7 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/schedule', require('./routes/schedule'));
 app.use('/api/studygroup', require('./routes/studygroup'));
+app.use('/api/availability', require('./routes/availability'));
 
 // Puerto y servidor
 const PORT = process.env.PORT || 5000;
