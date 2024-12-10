@@ -1,5 +1,6 @@
 const express = require('express');
 const StudyGroup = require('../models/StudyGroups');
+const Schedule = require('../models/Schedules');
 
 const getGroupStudy = async (req, res) => {
     try {
@@ -19,22 +20,70 @@ const getGroupStudy = async (req, res) => {
 }
 
 const createGroupStudy = async (req, res = express.response) => {
-    const { members = [], ...body } = req.body;
+    const { members = [], schedule, ...body } = req.body;
 
     try {
         // Combina el usuario que crea el grupo con los miembros adicionales sin duplicados
-        const uniqueMembers = Array.from(new Set([...members, req.uid]));
+        const uniqueMembers = Array.from(new Set([...members, req.uid])); // Aseguramos que el creador no se repita
 
+        // Crea el grupo de estudio
         const studyGroup = new StudyGroup({
             ...body,
             members: uniqueMembers,
+            schedule: schedule // Guardamos la información del horario en el grupo
         });
 
+        // Guardamos el grupo de estudio en la base de datos
         const studyGroupDB = await studyGroup.save();
 
+        // Primero, creamos el evento para el creador
+        const scheduleEvent = new Schedule({
+            title: `Grupo de estudio: ${studyGroup.name}`,
+            type: "Estudio",
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            details: {
+                professor: studyGroup.description, // O puedes cambiarlo por un campo que contenga el profesor
+                classroom: "No especificado", // Si lo deseas, puedes agregar una propiedad classroom al grupo
+                notes: `Grupo de estudio creado para el tema ${studyGroup.subject}`
+            },
+            user: req.uid, // Usamos el ID del creador del grupo
+        });
+
+        // Guardamos el evento en el calendario para el creador
+        const scheduleEventDB = await scheduleEvent.save();
+
+        // Añadimos el ID del evento en el grupo de estudio
+        studyGroup.schedule.eventId = scheduleEventDB._id;
+        await studyGroup.save();
+
+        // Ahora asignamos el evento a los otros miembros (sin agregarlo de nuevo para el creador)
+        for (const memberId of uniqueMembers) {
+            // Solo agregamos el evento si el miembro no es el creador
+            if (memberId !== req.uid) {
+                const memberSchedule = new Schedule({
+                    title: `Grupo de estudio: ${studyGroup.name}`,
+                    type: "Estudio",
+                    startTime: schedule.startTime,
+                    endTime: schedule.endTime,
+                    details: {
+                        professor: studyGroup.description,
+                        classroom: "No especificado",
+                        notes: `Grupo de estudio creado para el tema ${studyGroup.subject}`
+                    },
+                    user: memberId, // Asociamos el evento con cada miembro
+                });
+
+                // Guardamos el evento en el calendario para cada miembro
+                await memberSchedule.save();
+            }
+        }
+
+        // Respondemos con los datos del grupo y el evento
         res.json({
             ok: true,
             studyGroup: studyGroupDB,
+            scheduleEvent: scheduleEventDB,
         });
     } catch (error) {
         console.error(error);
@@ -44,8 +93,6 @@ const createGroupStudy = async (req, res = express.response) => {
         });
     }
 };
-
-
 
 const updateGroupStudy = async (req, res = express.response) => {
     const studyGroupId = req.params.id;
