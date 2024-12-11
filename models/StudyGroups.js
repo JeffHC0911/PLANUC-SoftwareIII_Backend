@@ -23,6 +23,9 @@ const studyGroupSchema = Schema({
     },
     description: {
         type: String,
+    },
+    meetLink: {
+        type: String,
     }
 
 });
